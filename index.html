@@ -617,6 +617,139 @@ aside {
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(110,43,255,0.4); border-radius: 2px; }
+
+/* ── OWNER MODE ── */
+.owner-btn {
+  position: fixed;
+  bottom: 2rem;
+  left: 2rem;
+  z-index: 500;
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.08);
+  cursor: pointer;
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.2);
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  backdrop-filter: blur(8px);
+}
+.owner-btn:hover { color: rgba(255,255,255,0.5); border-color: rgba(255,255,255,0.2); }
+.owner-btn.active { color: #34d399; border-color: #34d399; background: rgba(52,211,153,0.1); box-shadow: 0 0 16px rgba(52,211,153,0.2); }
+
+.card-actions {
+  display: none;
+  position: absolute;
+  top: 8px; right: 8px;
+  gap: 6px;
+  z-index: 10;
+}
+.owner-mode .palacio-card { position: relative; }
+.owner-mode .card-actions { display: flex; }
+
+.card-action-btn {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s;
+  backdrop-filter: blur(8px);
+}
+.card-action-btn:hover { transform: scale(1.15); }
+.btn-edit-card { background: rgba(110,43,255,0.8); color: white; }
+.btn-del-card  { background: rgba(220,38,38,0.8); color: white; }
+
+/* ── EDIT PANEL ── */
+.edit-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(3,2,10,0.88);
+  z-index: 700;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  backdrop-filter: blur(12px);
+}
+.edit-overlay.open { display: flex; }
+
+.edit-panel {
+  background: rgba(10,6,30,0.98);
+  border: 1px solid rgba(52,211,153,0.3);
+  border-radius: 20px;
+  padding: 2rem;
+  width: 100%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 0 60px rgba(52,211,153,0.1);
+  animation: lbIn 0.25s cubic-bezier(.22,.68,0,1.2);
+}
+
+.edit-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #34d399;
+  margin-bottom: 1.5rem;
+}
+
+.btn-save-edit {
+  width: 100%;
+  margin-top: 0.75rem;
+  padding: 0.8rem;
+  border: none;
+  border-radius: 10px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: linear-gradient(135deg, #059669, #34d399);
+  color: white;
+  letter-spacing: 0.04em;
+  transition: opacity 0.15s;
+}
+.btn-save-edit:hover { opacity: 0.88; }
+
+/* ── PASSWORD MODAL ── */
+.pwd-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(3,2,10,0.9);
+  z-index: 800;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(16px);
+}
+.pwd-overlay.open { display: flex; }
+.pwd-box {
+  background: rgba(10,6,30,0.98);
+  border: 1px solid rgba(110,43,255,0.3);
+  border-radius: 16px;
+  padding: 2rem;
+  width: 300px;
+  text-align: center;
+  animation: lbIn 0.2s cubic-bezier(.22,.68,0,1.2);
+}
+.pwd-title { font-family:'Syne',sans-serif; font-size:1rem; font-weight:700; color:var(--star); margin-bottom:1rem; }
+.pwd-input {
+  width:100%; padding:0.65rem 0.9rem; border:1px solid rgba(110,43,255,0.3);
+  border-radius:10px; font-family:'Outfit',sans-serif; font-size:1rem;
+  background:rgba(255,255,255,0.04); color:var(--text); outline:none;
+  text-align:center; letter-spacing:0.2em; margin-bottom:1rem;
+}
+.pwd-input:focus { border-color:var(--nebula1); }
+.pwd-err { font-size:0.78rem; color:#f87171; margin-top:-0.5rem; margin-bottom:0.75rem; display:none; }
+.pwd-err.show { display:block; }
+
 </style>
 </head>
 <body>
@@ -632,7 +765,7 @@ aside {
 <header>
   <div class="logo-orbit"></div>
   <h1 class="site-title">Memórias do João</h1>
-  <p class="site-sub">Palácios da Memória · Medicina · Barceló</p>
+  <p class="site-sub">Bem-vindos ao meu cérebro maluco</p>
 </header>
 
 <nav id="yearNav"></nav>
@@ -657,6 +790,75 @@ aside {
 <!-- FAB -->
 <button class="fab" onclick="toggleAdmin()" title="Adicionar palácio">+</button>
 
+<!-- Owner mode toggle (discreto, canto inferior esquerdo) -->
+<button class="owner-btn" id="ownerBtn" onclick="requestOwner()" title="Modo owner">⚙</button>
+
+<!-- Password modal -->
+<div class="pwd-overlay" id="pwdOverlay">
+  <div class="pwd-box">
+    <div class="pwd-title">🔐 Acesso owner</div>
+    <input class="pwd-input" type="password" id="pwdInput" placeholder="••••••" maxlength="20">
+    <div class="pwd-err" id="pwdErr">Senha incorreta</div>
+    <button class="btn-save" onclick="checkPwd()" style="margin-top:0">Entrar</button>
+    <button class="btn-cancel" onclick="closePwd()" style="margin-top:0.5rem">Cancelar</button>
+  </div>
+</div>
+
+<!-- Edit overlay -->
+<div class="edit-overlay" id="editOverlay">
+  <div class="edit-panel">
+    <div class="edit-title">✏️ Editar palácio</div>
+    <input type="hidden" id="eId">
+
+    <div class="form-grid">
+      <div class="form-row">
+        <label class="form-label">Ano</label>
+        <select class="form-select" id="eAno">
+          <option value="1">1º Ano</option>
+          <option value="2">2º Ano</option>
+          <option value="3">3º Ano</option>
+          <option value="4">4º Ano</option>
+          <option value="5">5º Ano</option>
+          <option value="6">6º Ano</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">ERA</label>
+        <select class="form-select" id="eEra">
+          <option value="1">ERA 1</option>
+          <option value="2">ERA 2</option>
+          <option value="3">ERA 3</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label class="form-label">Matéria</label>
+      <input class="form-input" id="eMateria" list="materiasList2" autocomplete="off">
+      <datalist id="materiasList2"></datalist>
+    </div>
+
+    <div class="form-row">
+      <label class="form-label">Título</label>
+      <input class="form-input" id="eTitulo">
+    </div>
+
+    <div class="form-row">
+      <label class="form-label">Descrição</label>
+      <textarea class="form-textarea" id="eDesc"></textarea>
+    </div>
+
+    <div class="form-row">
+      <label class="form-label">Substituir imagem (opcional)</label>
+      <input type="file" class="form-input" id="eImagem" accept="image/*" onchange="previewEditImg(this)">
+      <img class="img-preview" id="eImgPreview" alt="preview">
+    </div>
+
+    <button class="btn-save-edit" onclick="salvarEdicao()">Salvar alterações</button>
+    <button class="btn-cancel" onclick="closeEdit()">Cancelar</button>
+  </div>
+</div>
+
 <!-- Admin overlay -->
 <div class="admin-overlay" id="adminOverlay">
   <div class="admin-panel">
@@ -670,7 +872,7 @@ aside {
           <option value="2">2º Ano</option>
           <option value="3">3º Ano</option>
           <option value="4">4º Ano</option>
-          <option value="5">5º Ano</option>
+          <option value="5" selected>5º Ano</option>
           <option value="6">6º Ano</option>
         </select>
       </div>
@@ -786,7 +988,7 @@ let currentMateria = null;
 let currentEra = '1';
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
-function getYears(){ const y=[...new Set(db.palacios.map(p=>p.ano))].sort(); return y.length?y:['1']; }
+function getYears(){ const y=[...new Set(db.palacios.map(p=>p.ano))].sort(); return y.length?y:['5']; }
 function getMaterias(yr){ return [...new Set(db.palacios.filter(p=>p.ano===yr).map(p=>p.materia))].sort(); }
 function eraColor(e){ return e==='1'?'#f97316':e==='2'?'#a78bfa':'#34d399'; }
 
@@ -849,6 +1051,10 @@ function renderCard(p, i){
         <span class="palacio-era-badge" style="background:${c}22;color:${c};border:1px solid ${c}44">ERA ${p.era}</span>
         <div class="palacio-titulo">${p.titulo}</div>
         ${p.descricao?`<div class="palacio-desc">${p.descricao.substring(0,90)}${p.descricao.length>90?'…':''}</div>`:''}
+      </div>
+      <div class="card-actions">
+        <button class="card-action-btn btn-edit-card" onclick="event.stopPropagation();openEdit('${p.id}')" title="Editar">✏️</button>
+        <button class="card-action-btn btn-del-card"  onclick="event.stopPropagation();deletePalacio('${p.id}')" title="Excluir">🗑</button>
       </div>
     </div>`;
 }
@@ -926,14 +1132,138 @@ function updateMateriasList(){
 }
 
 document.addEventListener('keydown', e=>{
-  if(e.key==='Escape'){ closeLightbox(); document.getElementById('adminOverlay').classList.remove('open'); }
+  if(e.key==='Escape'){ closeLightbox(); document.getElementById('adminOverlay').classList.remove('open'); closeEdit(); closePwd(); }
 });
 
 document.getElementById('adminOverlay').addEventListener('click', e=>{
   if(e.target===document.getElementById('adminOverlay')) toggleAdmin();
 });
 
+// ── OWNER MODE ───────────────────────────────────────────────────────────────
+const OWNER_PWD = 'joao2025';
+let ownerMode = false;
+
+function requestOwner(){
+  if(ownerMode){ deactivateOwner(); return; }
+  document.getElementById('pwdOverlay').classList.add('open');
+  setTimeout(()=>document.getElementById('pwdInput').focus(), 100);
+}
+
+function checkPwd(){
+  const val = document.getElementById('pwdInput').value;
+  if(val === OWNER_PWD){
+    ownerMode = true;
+    document.getElementById('pwdOverlay').classList.remove('open');
+    document.getElementById('pwdInput').value = '';
+    document.getElementById('pwdErr').classList.remove('show');
+    document.getElementById('ownerBtn').classList.add('active');
+    document.body.classList.add('owner-mode');
+    document.getElementById('adminOverlay').style.display = '';
+    document.querySelector('.fab').style.display = '';
+  } else {
+    document.getElementById('pwdErr').classList.add('show');
+    document.getElementById('pwdInput').value = '';
+    document.getElementById('pwdInput').focus();
+  }
+}
+
+function deactivateOwner(){
+  ownerMode = false;
+  document.getElementById('ownerBtn').classList.remove('active');
+  document.body.classList.remove('owner-mode');
+}
+
+function closePwd(){
+  document.getElementById('pwdOverlay').classList.remove('open');
+  document.getElementById('pwdInput').value = '';
+  document.getElementById('pwdErr').classList.remove('show');
+}
+
+document.getElementById('pwdInput').addEventListener('keydown', e=>{ if(e.key==='Enter') checkPwd(); });
+document.getElementById('pwdOverlay').addEventListener('click', e=>{ if(e.target===document.getElementById('pwdOverlay')) closePwd(); });
+
+// Esconde FAB e botão add para não-owners inicialmente
+// (owner ativa via botão)
+document.addEventListener('DOMContentLoaded', ()=>{
+  if(!ownerMode){
+    document.querySelector('.fab').style.display = 'none';
+  }
+});
+
+// ── EDIT ─────────────────────────────────────────────────────────────────────
+function openEdit(id){
+  if(!ownerMode) return;
+  const p = db.palacios.find(x=>x.id===id);
+  if(!p) return;
+  document.getElementById('eId').value = p.id;
+  document.getElementById('eAno').value = p.ano;
+  document.getElementById('eEra').value = p.era;
+  document.getElementById('eMateria').value = p.materia;
+  document.getElementById('eTitulo').value = p.titulo;
+  document.getElementById('eDesc').value = p.descricao||'';
+  const prev = document.getElementById('eImgPreview');
+  if(p.imagem){ prev.src=p.imagem; prev.style.display='block'; } else { prev.style.display='none'; }
+  document.getElementById('eImagem').value='';
+  document.getElementById('editOverlay').classList.add('open');
+
+  // update datalist
+  const all=[...new Set(db.palacios.map(x=>x.materia))].sort();
+  document.getElementById('materiasList2').innerHTML=all.map(m=>`<option value="${m}">`).join('');
+}
+
+function closeEdit(){
+  document.getElementById('editOverlay').classList.remove('open');
+}
+
+function previewEditImg(input){
+  const file=input.files[0]; if(!file) return;
+  const r=new FileReader();
+  r.onload=e=>{ const p=document.getElementById('eImgPreview'); p.src=e.target.result; p.style.display='block'; };
+  r.readAsDataURL(file);
+}
+
+function salvarEdicao(){
+  const id = document.getElementById('eId').value;
+  const idx = db.palacios.findIndex(x=>x.id===id);
+  if(idx===-1) return;
+  const imgInput = document.getElementById('eImagem');
+
+  function finish(imgData){
+    db.palacios[idx] = {
+      ...db.palacios[idx],
+      ano: document.getElementById('eAno').value,
+      era: document.getElementById('eEra').value,
+      materia: document.getElementById('eMateria').value.trim(),
+      titulo: document.getElementById('eTitulo').value.trim(),
+      descricao: document.getElementById('eDesc').value.trim(),
+      imagem: imgData !== null ? imgData : db.palacios[idx].imagem
+    };
+    saveData(db);
+    currentYear = db.palacios[idx].ano;
+    currentMateria = db.palacios[idx].materia;
+    currentEra = db.palacios[idx].era;
+    closeEdit();
+    render();
+  }
+
+  if(imgInput.files[0]){ const r=new FileReader(); r.onload=e=>finish(e.target.result); r.readAsDataURL(imgInput.files[0]); }
+  else finish(null);
+}
+
+function deletePalacio(id){
+  if(!ownerMode) return;
+  if(!confirm('Excluir este palácio? Não tem volta.')) return;
+  db.palacios = db.palacios.filter(x=>x.id!==id);
+  saveData(db);
+  render();
+}
+
+document.getElementById('editOverlay').addEventListener('click', e=>{ if(e.target===document.getElementById('editOverlay')) closeEdit(); });
+
 render();
+
+// Aplica estado inicial do FAB após render
+if(!ownerMode) document.querySelector('.fab').style.display='none';
 </script>
 </body>
 </html>
