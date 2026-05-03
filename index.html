@@ -978,25 +978,52 @@ aside {
   document.addEventListener('mouseup', ()=>{ cur.style.width='10px'; cur.style.height='10px'; });
 })();
 
-// ── DATA ─────────────────────────────────────────────────────────────────────
-function loadData(){ const s = localStorage.getItem('memorias_joao_v2'); return s ? JSON.parse(s) : { palacios: [] }; }
-function saveData(d){ localStorage.setItem('memorias_joao_v2', JSON.stringify(d)); }
+// ── CONFIG ───────────────────────────────────────────────────────────────────
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwTSZ8vDrayF6vXQrTUXZDUm1efkOMLeVckR0tb8meDurCKSyqyXK3nw1KONuMnz2ZMtg/exec';
+const OWNER_PWD  = 'joao2025';
 
-let db = loadData();
-let currentYear = null;
+// ── STATE ────────────────────────────────────────────────────────────────────
+let db = { palacios: [] };
+let currentYear    = null;
 let currentMateria = null;
-let currentEra = '1';
+let currentEra     = '1';
+let ownerMode      = false;
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
-function getYears(){ const y=[...new Set(db.palacios.map(p=>p.ano))].sort(); return y.length?y:['5']; }
-function getMaterias(yr){ return [...new Set(db.palacios.filter(p=>p.ano===yr).map(p=>p.materia))].sort(); }
+function getYears(){ const y=[...new Set(db.palacios.map(p=>String(p.ano)))].sort(); return y.length?y:['5']; }
+function getMaterias(yr){ return [...new Set(db.palacios.filter(p=>String(p.ano)===String(yr)).map(p=>p.materia))].sort(); }
 function eraColor(e){ return e==='1'?'#f97316':e==='2'?'#a78bfa':'#34d399'; }
+
+function setLoading(msg){
+  document.getElementById('contentArea').innerHTML=`<div class="empty-state"><span class="empty-icon" style="font-size:1.5rem;animation:none">⏳</span><p>${msg}</p></div>`;
+}
+
+// ── API ──────────────────────────────────────────────────────────────────────
+async function apiGet(){
+  try {
+    const r = await fetch(SCRIPT_URL);
+    const data = await r.json();
+    db.palacios = Array.isArray(data) ? data.map(p=>({...p, ano:String(p.ano), era:String(p.era)})) : [];
+  } catch(e){ db.palacios = []; }
+}
+
+async function apiPost(body){
+  await fetch(SCRIPT_URL, {
+    method:'POST',
+    body: JSON.stringify(body)
+  });
+}
+
+// ── DRIVE IMAGE UPLOAD ───────────────────────────────────────────────────────
+// Converte arquivo para link público do Drive via base64 no Apps Script
+// Como não temos upload direto, salvamos a imagem como base64 na planilha
+// (funciona para imagens pequenas/médias — ideal para desenhos)
 
 // ── RENDER ───────────────────────────────────────────────────────────────────
 function renderNav(){
   const nav = document.getElementById('yearNav');
   const years = getYears();
-  if(!currentYear) currentYear = years[0];
+  if(!currentYear||!years.includes(currentYear)) currentYear = years[0];
   nav.innerHTML = years.map(y=>`
     <button class="year-tab ${y===currentYear?'active':''}" onclick="selectYear('${y}')">${y}º Ano</button>
   `).join('');
@@ -1017,11 +1044,11 @@ function renderSidebar(){
 function renderContent(){
   const area = document.getElementById('contentArea');
   if(!currentMateria){
-    area.innerHTML=`<div class="empty-state"><span class="empty-icon">🌌</span><p>Nenhum palácio ainda.<br>Clique no <strong>+</strong> para começar.</p></div>`;
+    area.innerHTML=`<div class="empty-state"><span class="empty-icon">🌌</span><p>Nenhum palácio ainda.<br>${ownerMode?'Clique no <strong>+</strong> para começar.':'Em breve...'}</p></div>`;
     return;
   }
-  const palacios = db.palacios.filter(p=>p.ano===currentYear&&p.materia===currentMateria&&p.era===currentEra);
-  const eraCount = e => db.palacios.filter(p=>p.ano===currentYear&&p.materia===currentMateria&&p.era===e).length;
+  const palacios = db.palacios.filter(p=>String(p.ano)===String(currentYear)&&p.materia===currentMateria&&String(p.era)===String(currentEra));
+  const eraCount = e => db.palacios.filter(p=>String(p.ano)===String(currentYear)&&p.materia===currentMateria&&String(p.era)===String(e)).length;
 
   area.innerHTML = `
     <div class="content-header">
@@ -1035,18 +1062,18 @@ function renderContent(){
         </button>`).join('')}
     </div>
     ${palacios.length===0
-      ? `<div class="empty-state"><span class="empty-icon">🏛</span><p>Nenhum palácio na ERA ${currentEra} de ${currentMateria}.<br>Clique no <strong>+</strong> para adicionar.</p></div>`
+      ? `<div class="empty-state"><span class="empty-icon">🏛</span><p>Nenhum palácio na ERA ${currentEra} de ${currentMateria}.</p></div>`
       : `<div class="palacio-grid">${palacios.map((p,i)=>renderCard(p,i)).join('')}</div>`}`;
 }
 
 function renderCard(p, i){
-  const c = eraColor(p.era);
+  const c = eraColor(String(p.era));
   const hasImg = p.imagem && p.imagem.length > 0;
   return `
     <div class="palacio-card" style="animation-delay:${i*0.06}s" onclick="openLightbox('${p.id}')">
       ${hasImg
         ? `<img class="palacio-img" src="${p.imagem}" alt="${p.titulo}" loading="lazy">`
-        : `<div class="palacio-img-placeholder" style="background:linear-gradient(135deg,rgba(110,43,255,0.08),rgba(192,38,211,0.06))">sem imagem</div>`}
+        : `<div class="palacio-img-placeholder">sem imagem</div>`}
       <div class="palacio-info">
         <span class="palacio-era-badge" style="background:${c}22;color:${c};border:1px solid ${c}44">ERA ${p.era}</span>
         <div class="palacio-titulo">${p.titulo}</div>
@@ -1061,6 +1088,12 @@ function renderCard(p, i){
 
 function render(){ renderNav(); renderSidebar(); renderContent(); updateMateriasList(); }
 
+async function loadAndRender(){
+  setLoading('Carregando palácios...');
+  await apiGet();
+  render();
+}
+
 // ── NAVIGATION ───────────────────────────────────────────────────────────────
 function selectYear(y){ currentYear=y; currentMateria=null; render(); }
 function selectMateria(m){ currentMateria=m; renderContent(); }
@@ -1068,7 +1101,7 @@ function selectEra(e){ currentEra=e; renderContent(); }
 
 // ── LIGHTBOX ─────────────────────────────────────────────────────────────────
 function openLightbox(id){
-  const p = db.palacios.find(x=>x.id===id);
+  const p = db.palacios.find(x=>String(x.id)===String(id));
   if(!p) return;
   const img = document.getElementById('lightboxImg');
   img.src = p.imagem||'';
@@ -1080,69 +1113,7 @@ function openLightbox(id){
 function closeLightbox(){ document.getElementById('lightbox').classList.remove('open'); }
 document.getElementById('lightbox').addEventListener('click', e=>{ if(e.target===document.getElementById('lightbox')) closeLightbox(); });
 
-// ── ADMIN ────────────────────────────────────────────────────────────────────
-function toggleAdmin(){
-  const ov = document.getElementById('adminOverlay');
-  ov.classList.toggle('open');
-  if(ov.classList.contains('open')&&currentYear){
-    document.getElementById('fAno').value = currentYear;
-    document.getElementById('fEra').value = currentEra;
-    if(currentMateria) document.getElementById('fMateria').value = currentMateria;
-  }
-}
-
-function previewImg(input){
-  const file = input.files[0]; if(!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const prev = document.getElementById('imgPreview');
-    prev.src = e.target.result; prev.style.display='block';
-  };
-  reader.readAsDataURL(file);
-}
-
-function salvarPalacio(){
-  const ano = document.getElementById('fAno').value;
-  const era = document.getElementById('fEra').value;
-  const materia = document.getElementById('fMateria').value.trim();
-  const titulo = document.getElementById('fTitulo').value.trim();
-  const desc = document.getElementById('fDesc').value.trim();
-  const imgInput = document.getElementById('fImagem');
-  if(!materia||!titulo){ alert('Preencha matéria e título.'); return; }
-
-  function finish(imgData){
-    db.palacios.push({ id: Date.now().toString(), ano, era, materia, titulo, descricao: desc, imagem: imgData||'' });
-    saveData(db);
-    currentYear = ano; currentMateria = materia; currentEra = era;
-    ['fMateria','fTitulo','fDesc'].forEach(id=>document.getElementById(id).value='');
-    document.getElementById('fImagem').value='';
-    document.getElementById('imgPreview').style.display='none';
-    toggleAdmin();
-    render();
-  }
-
-  if(imgInput.files[0]){ const r=new FileReader(); r.onload=e=>finish(e.target.result); r.readAsDataURL(imgInput.files[0]); }
-  else finish('');
-}
-
-function updateMateriasList(){
-  const all=[...new Set(db.palacios.map(p=>p.materia))].sort();
-  const dl=document.getElementById('materiasList');
-  if(dl) dl.innerHTML=all.map(m=>`<option value="${m}">`).join('');
-}
-
-document.addEventListener('keydown', e=>{
-  if(e.key==='Escape'){ closeLightbox(); document.getElementById('adminOverlay').classList.remove('open'); closeEdit(); closePwd(); }
-});
-
-document.getElementById('adminOverlay').addEventListener('click', e=>{
-  if(e.target===document.getElementById('adminOverlay')) toggleAdmin();
-});
-
 // ── OWNER MODE ───────────────────────────────────────────────────────────────
-const OWNER_PWD = 'joao2025';
-let ownerMode = false;
-
 function requestOwner(){
   if(ownerMode){ deactivateOwner(); return; }
   document.getElementById('pwdOverlay').classList.add('open');
@@ -1158,8 +1129,8 @@ function checkPwd(){
     document.getElementById('pwdErr').classList.remove('show');
     document.getElementById('ownerBtn').classList.add('active');
     document.body.classList.add('owner-mode');
-    document.getElementById('adminOverlay').style.display = '';
-    document.querySelector('.fab').style.display = '';
+    document.querySelector('.fab').style.display = 'flex';
+    render();
   } else {
     document.getElementById('pwdErr').classList.add('show');
     document.getElementById('pwdInput').value = '';
@@ -1171,6 +1142,8 @@ function deactivateOwner(){
   ownerMode = false;
   document.getElementById('ownerBtn').classList.remove('active');
   document.body.classList.remove('owner-mode');
+  document.querySelector('.fab').style.display = 'none';
+  render();
 }
 
 function closePwd(){
@@ -1182,38 +1155,84 @@ function closePwd(){
 document.getElementById('pwdInput').addEventListener('keydown', e=>{ if(e.key==='Enter') checkPwd(); });
 document.getElementById('pwdOverlay').addEventListener('click', e=>{ if(e.target===document.getElementById('pwdOverlay')) closePwd(); });
 
-// Esconde FAB e botão add para não-owners inicialmente
-// (owner ativa via botão)
-document.addEventListener('DOMContentLoaded', ()=>{
-  if(!ownerMode){
-    document.querySelector('.fab').style.display = 'none';
+// ── ADMIN — ADICIONAR ────────────────────────────────────────────────────────
+function toggleAdmin(){
+  if(!ownerMode) return;
+  const ov = document.getElementById('adminOverlay');
+  ov.classList.toggle('open');
+  if(ov.classList.contains('open')&&currentYear){
+    document.getElementById('fAno').value = currentYear;
+    document.getElementById('fEra').value = currentEra;
+    if(currentMateria) document.getElementById('fMateria').value = currentMateria;
   }
-});
+}
+
+function previewImg(input){
+  const file=input.files[0]; if(!file) return;
+  const r=new FileReader();
+  r.onload=e=>{ const p=document.getElementById('imgPreview'); p.src=e.target.result; p.style.display='block'; };
+  r.readAsDataURL(file);
+}
+
+async function salvarPalacio(){
+  const ano    = document.getElementById('fAno').value;
+  const era    = document.getElementById('fEra').value;
+  const materia= document.getElementById('fMateria').value.trim();
+  const titulo = document.getElementById('fTitulo').value.trim();
+  const desc   = document.getElementById('fDesc').value.trim();
+  const imgInput = document.getElementById('fImagem');
+  if(!materia||!titulo){ alert('Preencha matéria e título.'); return; }
+
+  const saveBtn = document.querySelector('#adminOverlay .btn-save');
+  saveBtn.textContent = 'Salvando...'; saveBtn.disabled = true;
+
+  async function finish(imgData){
+    const palacio = { action:'add', id: Date.now().toString(), ano, era, materia, titulo, descricao:desc, imagem:imgData||'' };
+    await apiPost(palacio);
+    db.palacios.push({...palacio});
+    currentYear=ano; currentMateria=materia; currentEra=era;
+    ['fMateria','fTitulo','fDesc'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('fImagem').value='';
+    document.getElementById('imgPreview').style.display='none';
+    saveBtn.textContent='Salvar palácio'; saveBtn.disabled=false;
+    document.getElementById('adminOverlay').classList.remove('open');
+    render();
+  }
+
+  if(imgInput.files[0]){
+    const r=new FileReader();
+    r.onload=e=>finish(e.target.result);
+    r.readAsDataURL(imgInput.files[0]);
+  } else finish('');
+}
+
+function updateMateriasList(){
+  const all=[...new Set(db.palacios.map(p=>p.materia))].sort();
+  ['materiasList','materiasList2'].forEach(id=>{
+    const dl=document.getElementById(id);
+    if(dl) dl.innerHTML=all.map(m=>`<option value="${m}">`).join('');
+  });
+}
 
 // ── EDIT ─────────────────────────────────────────────────────────────────────
 function openEdit(id){
   if(!ownerMode) return;
-  const p = db.palacios.find(x=>x.id===id);
+  const p = db.palacios.find(x=>String(x.id)===String(id));
   if(!p) return;
-  document.getElementById('eId').value = p.id;
-  document.getElementById('eAno').value = p.ano;
-  document.getElementById('eEra').value = p.era;
+  document.getElementById('eId').value      = p.id;
+  document.getElementById('eAno').value     = p.ano;
+  document.getElementById('eEra').value     = p.era;
   document.getElementById('eMateria').value = p.materia;
-  document.getElementById('eTitulo').value = p.titulo;
-  document.getElementById('eDesc').value = p.descricao||'';
+  document.getElementById('eTitulo').value  = p.titulo;
+  document.getElementById('eDesc').value    = p.descricao||'';
   const prev = document.getElementById('eImgPreview');
   if(p.imagem){ prev.src=p.imagem; prev.style.display='block'; } else { prev.style.display='none'; }
   document.getElementById('eImagem').value='';
   document.getElementById('editOverlay').classList.add('open');
-
-  // update datalist
-  const all=[...new Set(db.palacios.map(x=>x.materia))].sort();
-  document.getElementById('materiasList2').innerHTML=all.map(m=>`<option value="${m}">`).join('');
+  updateMateriasList();
 }
 
-function closeEdit(){
-  document.getElementById('editOverlay').classList.remove('open');
-}
+function closeEdit(){ document.getElementById('editOverlay').classList.remove('open'); }
 
 function previewEditImg(input){
   const file=input.files[0]; if(!file) return;
@@ -1222,26 +1241,29 @@ function previewEditImg(input){
   r.readAsDataURL(file);
 }
 
-function salvarEdicao(){
-  const id = document.getElementById('eId').value;
-  const idx = db.palacios.findIndex(x=>x.id===id);
+async function salvarEdicao(){
+  const id  = document.getElementById('eId').value;
+  const idx = db.palacios.findIndex(x=>String(x.id)===String(id));
   if(idx===-1) return;
   const imgInput = document.getElementById('eImagem');
+  const saveBtn  = document.querySelector('#editOverlay .btn-save-edit');
+  saveBtn.textContent='Salvando...'; saveBtn.disabled=true;
 
-  function finish(imgData){
-    db.palacios[idx] = {
-      ...db.palacios[idx],
-      ano: document.getElementById('eAno').value,
-      era: document.getElementById('eEra').value,
-      materia: document.getElementById('eMateria').value.trim(),
-      titulo: document.getElementById('eTitulo').value.trim(),
-      descricao: document.getElementById('eDesc').value.trim(),
-      imagem: imgData !== null ? imgData : db.palacios[idx].imagem
+  async function finish(imgData){
+    const updated = {
+      action:'update',
+      id,
+      ano:      document.getElementById('eAno').value,
+      era:      document.getElementById('eEra').value,
+      materia:  document.getElementById('eMateria').value.trim(),
+      titulo:   document.getElementById('eTitulo').value.trim(),
+      descricao:document.getElementById('eDesc').value.trim(),
+      imagem:   imgData !== null ? imgData : db.palacios[idx].imagem
     };
-    saveData(db);
-    currentYear = db.palacios[idx].ano;
-    currentMateria = db.palacios[idx].materia;
-    currentEra = db.palacios[idx].era;
+    await apiPost(updated);
+    db.palacios[idx] = {...updated};
+    currentYear=updated.ano; currentMateria=updated.materia; currentEra=updated.era;
+    saveBtn.textContent='Salvar alterações'; saveBtn.disabled=false;
     closeEdit();
     render();
   }
@@ -1250,20 +1272,23 @@ function salvarEdicao(){
   else finish(null);
 }
 
-function deletePalacio(id){
+async function deletePalacio(id){
   if(!ownerMode) return;
   if(!confirm('Excluir este palácio? Não tem volta.')) return;
-  db.palacios = db.palacios.filter(x=>x.id!==id);
-  saveData(db);
+  await apiPost({ action:'delete', id });
+  db.palacios = db.palacios.filter(x=>String(x.id)!==String(id));
   render();
 }
 
 document.getElementById('editOverlay').addEventListener('click', e=>{ if(e.target===document.getElementById('editOverlay')) closeEdit(); });
+document.getElementById('adminOverlay').addEventListener('click', e=>{ if(e.target===document.getElementById('adminOverlay')) toggleAdmin(); });
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape'){ closeLightbox(); document.getElementById('adminOverlay').classList.remove('open'); closeEdit(); closePwd(); }
+});
 
-render();
-
-// Aplica estado inicial do FAB após render
-if(!ownerMode) document.querySelector('.fab').style.display='none';
+// ── INIT ─────────────────────────────────────────────────────────────────────
+document.querySelector('.fab').style.display = 'none';
+loadAndRender();
 </script>
 </body>
 </html>
