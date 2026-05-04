@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Memórias do João</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👽</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -35,6 +36,11 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   cursor: none;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  body { cursor: auto; }
+  .cursor, .cursor-ring { display: none !important; }
 }
 
 /* ── CUSTOM CURSOR ── */
@@ -613,6 +619,72 @@ aside {
   margin-top: 0.3rem;
 }
 
+/* ── SEARCH BAR ── */
+.search-wrap {
+  position: relative;
+  z-index: 10;
+  max-width: 520px;
+  margin: 0 auto 2rem;
+  padding: 0 1rem;
+}
+.search-input {
+  width: 100%;
+  padding: 0.75rem 1rem 0.75rem 2.8rem;
+  border: 1px solid rgba(110,43,255,0.3);
+  border-radius: 99px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.92rem;
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+  outline: none;
+  backdrop-filter: blur(12px);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.search-input::placeholder { color: var(--muted); }
+.search-input:focus {
+  border-color: var(--nebula1);
+  box-shadow: 0 0 0 3px rgba(110,43,255,0.15), 0 0 20px rgba(110,43,255,0.1);
+}
+.search-icon {
+  position: absolute;
+  left: 1.9rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 0.95rem;
+  pointer-events: none;
+}
+.search-results {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 1rem;
+  right: 1rem;
+  background: rgba(10,6,30,0.97);
+  border: 1px solid rgba(110,43,255,0.25);
+  border-radius: 14px;
+  overflow: hidden;
+  z-index: 200;
+  display: none;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+  backdrop-filter: blur(16px);
+}
+.search-results.show { display: block; }
+.search-result-item {
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  transition: background 0.15s;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.search-result-item:last-child { border-bottom: none; }
+.search-result-item:hover { background: rgba(110,43,255,0.12); }
+.sr-titulo { font-size: 0.9rem; color: var(--star); font-weight: 500; }
+.sr-meta { font-size: 0.72rem; color: var(--muted); }
+.sr-highlight { color: var(--nebula2); font-weight: 600; }
+.search-empty { padding: 1.2rem; text-align: center; color: var(--muted); font-size: 0.85rem; }
+
 /* ── SCROLLBAR ── */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -769,6 +841,12 @@ aside {
 </header>
 
 <nav id="yearNav"></nav>
+
+<div class="search-wrap">
+  <span class="search-icon">🔍</span>
+  <input class="search-input" id="searchInput" placeholder="Buscar palácio, matéria ou descrição..." autocomplete="off">
+  <div class="search-results" id="searchResults"></div>
+</div>
 
 <main>
   <aside id="sidebar"></aside>
@@ -962,21 +1040,74 @@ aside {
   window.addEventListener('resize', ()=>{ resize(); initStars(); });
 })();
 
-// ── CURSOR ───────────────────────────────────────────────────────────────────
-(function(){
-  const cur = document.getElementById('cur');
-  const ring = document.getElementById('curRing');
-  let mx=0, my=0, rx=0, ry=0;
-  document.addEventListener('mousemove', e => { mx=e.clientX; my=e.clientY; });
-  (function loop(){
-    rx += (mx-rx)*0.12; ry += (my-ry)*0.12;
-    cur.style.left = mx+'px'; cur.style.top = my+'px';
-    ring.style.left = rx+'px'; ring.style.top = ry+'px';
-    requestAnimationFrame(loop);
+// ── CURSOR (apenas desktop) ───────────────────────────────────────────────────
+if(window.matchMedia('(hover: hover) and (pointer: fine)').matches){
+  (function(){
+    const cur = document.getElementById('cur');
+    const ring = document.getElementById('curRing');
+    let mx=0, my=0, rx=0, ry=0;
+    document.addEventListener('mousemove', e => { mx=e.clientX; my=e.clientY; });
+    (function loop(){
+      rx += (mx-rx)*0.12; ry += (my-ry)*0.12;
+      cur.style.left = mx+'px'; cur.style.top = my+'px';
+      ring.style.left = rx+'px'; ring.style.top = ry+'px';
+      requestAnimationFrame(loop);
+    })();
+    document.addEventListener('mousedown', ()=>{ cur.style.width='6px'; cur.style.height='6px'; });
+    document.addEventListener('mouseup',   ()=>{ cur.style.width='10px'; cur.style.height='10px'; });
   })();
-  document.addEventListener('mousedown', ()=>{ cur.style.width='6px'; cur.style.height='6px'; });
-  document.addEventListener('mouseup', ()=>{ cur.style.width='10px'; cur.style.height='10px'; });
+}
+
+// ── SEARCH ───────────────────────────────────────────────────────────────────
+(function(){
+  const input = document.getElementById('searchInput');
+  const results = document.getElementById('searchResults');
+
+  function highlight(text, query){
+    if(!query) return text;
+    const re = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi');
+    return text.replace(re, '<span class="sr-highlight">$1</span>');
+  }
+
+  function search(q){
+    if(!q || q.length < 2){ results.classList.remove('show'); return; }
+    const lower = q.toLowerCase();
+    const found = db.palacios.filter(p =>
+      p.titulo.toLowerCase().includes(lower) ||
+      p.materia.toLowerCase().includes(lower) ||
+      (p.descricao||'').toLowerCase().includes(lower)
+    ).slice(0, 8);
+
+    if(!found.length){
+      results.innerHTML = '<div class="search-empty">Nenhum resultado encontrado</div>';
+    } else {
+      results.innerHTML = found.map(p => `
+        <div class="search-result-item" onclick="goToPalacio('${p.ano}','${p.materia}','${p.era}','${p.id}')">
+          <div class="sr-titulo">${highlight(p.titulo, q)}</div>
+          <div class="sr-meta">${highlight(p.materia, q)} · ${p.ano}º Ano · ERA ${p.era}</div>
+        </div>
+      `).join('');
+    }
+    results.classList.add('show');
+  }
+
+  input.addEventListener('input', e => search(e.target.value.trim()));
+  input.addEventListener('keydown', e => { if(e.key==='Escape'){ results.classList.remove('show'); input.blur(); } });
+  document.addEventListener('click', e => { if(!e.target.closest('.search-wrap')) results.classList.remove('show'); });
 })();
+
+function goToPalacio(ano, materia, era, id){
+  document.getElementById('searchResults').classList.remove('show');
+  document.getElementById('searchInput').value = '';
+  currentYear = String(ano);
+  currentMateria = materia;
+  currentEra = String(era);
+  render();
+  setTimeout(()=>{
+    const card = document.querySelector(`.palacio-card[onclick*="${id}"]`);
+    if(card){ card.scrollIntoView({behavior:'smooth', block:'center'}); openLightbox(id); }
+  }, 150);
+}
 
 // ── CONFIG ───────────────────────────────────────────────────────────────────
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzoINeeXVuDiCE6u0C_N34wr-EfGdYWuFJ-onZhZliN8lERUzZhwX3DQhJS1956xg-V/exec';
