@@ -622,7 +622,7 @@ aside {
 /* ── SEARCH BAR ── */
 .search-wrap {
   position: relative;
-  z-index: 10;
+  z-index: 100;
   max-width: 520px;
   margin: 0 auto 2rem;
   padding: 0 1rem;
@@ -663,7 +663,7 @@ aside {
   border: 1px solid rgba(110,43,255,0.25);
   border-radius: 14px;
   overflow: hidden;
-  z-index: 200;
+  z-index: 9000;
   display: none;
   box-shadow: 0 16px 48px rgba(0,0,0,0.5);
   backdrop-filter: blur(16px);
@@ -684,6 +684,93 @@ aside {
 .sr-meta { font-size: 0.72rem; color: var(--muted); }
 .sr-highlight { color: var(--nebula2); font-weight: 600; }
 .search-empty { padding: 1.2rem; text-align: center; color: var(--muted); font-size: 0.85rem; }
+
+/* ── SPLASH SCREEN ── */
+#splash {
+  position: fixed;
+  inset: 0;
+  z-index: 8000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--void);
+  transition: opacity 0.8s ease, transform 0.8s ease;
+}
+#splash.hide {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(1.04);
+}
+.splash-canvas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.splash-content {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  padding: 1rem;
+}
+.splash-et {
+  font-size: clamp(3rem, 10vw, 6rem);
+  display: block;
+  animation: etFloat 3s ease-in-out infinite;
+  filter: drop-shadow(0 0 30px rgba(110,43,255,0.6));
+  margin-bottom: 1rem;
+}
+@keyframes etFloat {
+  0%,100% { transform: translateY(0) rotate(-3deg); }
+  50%      { transform: translateY(-18px) rotate(3deg); }
+}
+.splash-title {
+  font-family: 'Syne', sans-serif;
+  font-size: clamp(2rem, 7vw, 4rem);
+  font-weight: 800;
+  background: linear-gradient(135deg, #c4b5fd 0%, #818cf8 40%, #38bdf8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.03em;
+  margin-bottom: 0.5rem;
+}
+.splash-sub {
+  font-size: 0.8rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 2.5rem;
+}
+.splash-btn {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 0.85rem 2.5rem;
+  border-radius: 99px;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(135deg, var(--nebula1), var(--nebula2));
+  color: white;
+  letter-spacing: 0.04em;
+  box-shadow: 0 0 30px rgba(110,43,255,0.4);
+  transition: transform 0.2s cubic-bezier(.22,.68,0,1.2), box-shadow 0.2s;
+  animation: pulseBtn 2.5s ease-in-out infinite;
+}
+.splash-btn:hover {
+  transform: scale(1.06);
+  box-shadow: 0 0 50px rgba(110,43,255,0.6);
+}
+@keyframes pulseBtn {
+  0%,100% { box-shadow: 0 0 30px rgba(110,43,255,0.4); }
+  50%      { box-shadow: 0 0 50px rgba(192,38,211,0.6); }
+}
+.splash-hint {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-top: 1rem;
+  letter-spacing: 0.08em;
+}
 
 /* ── SCROLLBAR ── */
 ::-webkit-scrollbar { width: 4px; }
@@ -825,6 +912,18 @@ aside {
 </style>
 </head>
 <body>
+
+<!-- ── SPLASH ── -->
+<div id="splash">
+  <canvas class="splash-canvas" id="splashCanvas"></canvas>
+  <div class="splash-content">
+    <span class="splash-et">👽</span>
+    <div class="splash-title">Memórias do João</div>
+    <div class="splash-sub">Bem-vindos ao meu cérebro maluco</div>
+    <button class="splash-btn" onclick="enterSite()">Entrar no cérebro →</button>
+    <div class="splash-hint">5º Ano · Medicina Barceló</div>
+  </div>
+</div>
 
 <div class="cursor" id="cur"></div>
 <div class="cursor-ring" id="curRing"></div>
@@ -1058,7 +1157,78 @@ if(window.matchMedia('(hover: hover) and (pointer: fine)').matches){
   })();
 }
 
-// ── SEARCH ───────────────────────────────────────────────────────────────────
+// ── SPLASH ───────────────────────────────────────────────────────────────────
+(function(){
+  const canvas = document.getElementById('splashCanvas');
+  const ctx = canvas.getContext('2d');
+  let W, H, particles = [], emojis = ['🧠','🏛','⚗️','🔬','💊','🫀','🫁','🧬','⚡','🌌','👽','✨','💉','🩺'];
+  let running = true;
+
+  function resize(){ W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+
+  function spawnParticle(){
+    return {
+      x: Math.random() * W,
+      y: H + 60,
+      emoji: emojis[Math.floor(Math.random() * emojis.length)],
+      size: 20 + Math.random() * 28,
+      vx: (Math.random() - 0.5) * 1.2,
+      vy: -(0.6 + Math.random() * 1.2),
+      alpha: 0,
+      fadeIn: true,
+      rot: (Math.random() - 0.5) * 0.04,
+      angle: Math.random() * Math.PI * 2,
+      life: 0,
+      maxLife: 220 + Math.random() * 120
+    };
+  }
+
+  function init(){
+    particles = [];
+    for(let i = 0; i < 18; i++){
+      const p = spawnParticle();
+      p.y = Math.random() * H;
+      p.life = Math.random() * p.maxLife;
+      p.alpha = 0.3 + Math.random() * 0.4;
+      p.fadeIn = false;
+      particles.push(p);
+    }
+  }
+
+  function draw(){
+    if(!running) return;
+    ctx.clearRect(0, 0, W, H);
+    particles.forEach(p => {
+      p.x += p.vx; p.y += p.vy; p.angle += p.rot; p.life++;
+      if(p.fadeIn && p.alpha < 0.7) p.alpha += 0.02;
+      if(p.life > p.maxLife - 40) p.alpha -= 0.018;
+      if(p.life > p.maxLife || p.y < -80){
+        Object.assign(p, spawnParticle());
+        return;
+      }
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, p.alpha);
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle);
+      ctx.font = p.size + 'px serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(p.emoji, 0, 0);
+      ctx.restore();
+    });
+    if(particles.length < 22 && Math.random() < 0.03) particles.push(spawnParticle());
+    requestAnimationFrame(draw);
+  }
+
+  resize(); init(); draw();
+  window.addEventListener('resize', ()=>{ resize(); });
+})();
+
+function enterSite(){
+  const splash = document.getElementById('splash');
+  splash.classList.add('hide');
+  setTimeout(()=>{ splash.style.display='none'; }, 800);
+}
 (function(){
   const input = document.getElementById('searchInput');
   const results = document.getElementById('searchResults');
