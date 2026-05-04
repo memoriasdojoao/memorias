@@ -1435,7 +1435,7 @@ async function loadAndRender(){
 
 // ── NAVIGATION ───────────────────────────────────────────────────────────────
 function selectYear(y){ currentYear=y; currentMateria=null; render(); }
-function selectMateria(m){ currentMateria=m; renderContent(); }
+function selectMateria(m){ currentMateria=m; renderSidebar(); renderContent(); updateMateriasList(); }
 function selectEra(e){ currentEra=e; renderContent(); }
 
 // ── LIGHTBOX ─────────────────────────────────────────────────────────────────
@@ -1453,6 +1453,32 @@ function closeLightbox(){ document.getElementById('lightbox').classList.remove('
 document.getElementById('lightbox').addEventListener('click', e=>{ if(e.target===document.getElementById('lightbox')) closeLightbox(); });
 
 // ── OWNER MODE ───────────────────────────────────────────────────────────────
+const SESSION_KEY = 'memorias_owner_exp';
+const SESSION_HOURS = 12;
+
+function isSessionValid(){
+  const exp = sessionStorage.getItem(SESSION_KEY) || localStorage.getItem(SESSION_KEY);
+  return exp && Date.now() < parseInt(exp);
+}
+
+function saveSession(){
+  const exp = Date.now() + SESSION_HOURS * 60 * 60 * 1000;
+  sessionStorage.setItem(SESSION_KEY, exp);
+  localStorage.setItem(SESSION_KEY, exp);
+}
+
+function clearSession(){
+  sessionStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(SESSION_KEY);
+}
+
+function activateOwnerUI(){
+  ownerMode = true;
+  document.getElementById('ownerBtn').classList.add('active');
+  document.body.classList.add('owner-mode');
+  document.querySelector('.fab').style.display = 'flex';
+  render();
+}
 function requestOwner(){
   if(ownerMode){ deactivateOwner(); return; }
   document.getElementById('pwdOverlay').classList.add('open');
@@ -1462,14 +1488,11 @@ function requestOwner(){
 function checkPwd(){
   const val = document.getElementById('pwdInput').value;
   if(val === OWNER_PWD){
-    ownerMode = true;
     document.getElementById('pwdOverlay').classList.remove('open');
     document.getElementById('pwdInput').value = '';
     document.getElementById('pwdErr').classList.remove('show');
-    document.getElementById('ownerBtn').classList.add('active');
-    document.body.classList.add('owner-mode');
-    document.querySelector('.fab').style.display = 'flex';
-    render();
+    saveSession();
+    activateOwnerUI();
   } else {
     document.getElementById('pwdErr').classList.add('show');
     document.getElementById('pwdInput').value = '';
@@ -1479,6 +1502,7 @@ function checkPwd(){
 
 function deactivateOwner(){
   ownerMode = false;
+  clearSession();
   document.getElementById('ownerBtn').classList.remove('active');
   document.body.classList.remove('owner-mode');
   document.querySelector('.fab').style.display = 'none';
@@ -1607,6 +1631,15 @@ document.addEventListener('keydown', e=>{
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
 document.querySelector('.fab').style.display = 'none';
+
+// Restaura sessão owner se ainda válida
+if(isSessionValid()){
+  ownerMode = true;
+  document.getElementById('ownerBtn').classList.add('active');
+  document.body.classList.add('owner-mode');
+  document.querySelector('.fab').style.display = 'flex';
+}
+
 loadAndRender();
 </script>
 </body>
