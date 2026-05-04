@@ -51,9 +51,10 @@ body {
   border-radius: 50%;
   pointer-events: none;
   z-index: 9999;
-  transform: translate(-50%,-50%);
-  transition: transform 0.08s, width 0.2s, height 0.2s, background 0.2s;
+  left: 0; top: 0;
+  transition: width 0.2s, height 0.2s;
   mix-blend-mode: screen;
+  will-change: transform;
 }
 .cursor-ring {
   position: fixed;
@@ -62,8 +63,8 @@ body {
   border-radius: 50%;
   pointer-events: none;
   z-index: 9998;
-  transform: translate(-50%,-50%);
-  transition: transform 0.18s ease-out, width 0.25s, height 0.25s;
+  left: 0; top: 0;
+  will-change: transform;
 }
 
 /* ── STAR CANVAS ── */
@@ -78,15 +79,22 @@ body {
 .nebula {
   position: fixed;
   border-radius: 50%;
-  filter: blur(80px);
+  filter: blur(60px);
   pointer-events: none;
   z-index: 0;
-  opacity: 0.18;
-  animation: drift 18s ease-in-out infinite alternate;
+  opacity: 0.12;
+  animation: drift 22s ease-in-out infinite alternate;
+  will-change: transform;
 }
-.nb1 { width: 600px; height: 600px; background: var(--nebula1); top: -200px; left: -200px; animation-delay: 0s; }
-.nb2 { width: 500px; height: 500px; background: var(--nebula2); bottom: -150px; right: -100px; animation-delay: -6s; }
-.nb3 { width: 400px; height: 400px; background: var(--nebula3); top: 40%; left: 50%; animation-delay: -12s; }
+.nb1 { width: 500px; height: 500px; background: var(--nebula1); top: -180px; left: -180px; animation-delay: 0s; }
+.nb2 { width: 420px; height: 420px; background: var(--nebula2); bottom: -120px; right: -80px; animation-delay: -8s; }
+.nb3 { width: 350px; height: 350px; background: var(--nebula3); top: 40%; left: 50%; animation-delay: -16s; }
+
+@media (max-width: 768px) {
+  .nb1 { width: 300px; height: 300px; }
+  .nb2 { width: 280px; height: 280px; }
+  .nb3 { display: none; }
+}
 
 @keyframes drift {
   from { transform: translate(0,0) scale(1); }
@@ -313,8 +321,10 @@ aside {
   overflow: hidden;
   cursor: pointer;
   transition: transform 0.25s cubic-bezier(.22,.68,0,1.2), box-shadow 0.25s, border-color 0.25s;
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(8px);
   animation: cardIn 0.4s ease both;
+  will-change: transform;
+  contain: layout style;
 }
 
 @keyframes cardIn {
@@ -1112,12 +1122,15 @@ aside {
 </div>
 
 <script>
-// ── STARFIELD ────────────────────────────────────────────────────────────────
+// ── STARFIELD (otimizado) ─────────────────────────────────────────────────────
 (function(){
   const canvas = document.getElementById('starfield');
   const ctx = canvas.getContext('2d');
-  let stars = [];
-  let W, H;
+  let stars = [], W, H, last = 0;
+  const isMobile = window.innerWidth < 768;
+  const density = isMobile ? 8000 : 4500;
+  const fps = isMobile ? 20 : 30;
+  const interval = 1000 / fps;
 
   function resize(){
     W = canvas.width = window.innerWidth;
@@ -1126,106 +1139,114 @@ aside {
 
   function initStars(){
     stars = [];
-    const count = Math.floor((W * H) / 3000);
+    const count = Math.min(Math.floor((W * H) / density), isMobile ? 80 : 180);
     for(let i = 0; i < count; i++){
       stars.push({
         x: Math.random() * W,
         y: Math.random() * H,
-        r: Math.random() * 1.4,
-        alpha: Math.random() * 0.8 + 0.1,
-        speed: Math.random() * 0.3 + 0.05,
-        twinkle: Math.random() * Math.PI * 2
+        r: Math.random() * 1.2 + 0.2,
+        alpha: Math.random() * 0.7 + 0.15,
+        twinkle: Math.random() * Math.PI * 2,
+        speed: Math.random() * 0.015 + 0.005
       });
     }
   }
 
-  function draw(){
+  function draw(ts){
+    requestAnimationFrame(draw);
+    if(ts - last < interval) return;
+    last = ts;
     ctx.clearRect(0, 0, W, H);
-    const t = Date.now() * 0.001;
+    ctx.fillStyle = 'rgba(200,190,255,1)';
     stars.forEach(s => {
-      s.twinkle += 0.008;
-      const a = s.alpha * (0.6 + 0.4 * Math.sin(s.twinkle));
+      s.twinkle += s.speed;
+      const a = s.alpha * (0.55 + 0.45 * Math.sin(s.twinkle));
+      ctx.globalAlpha = a;
       ctx.beginPath();
       ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(200,190,255,${a})`;
       ctx.fill();
     });
-    requestAnimationFrame(draw);
+    ctx.globalAlpha = 1;
   }
 
-  resize();
-  initStars();
-  draw();
-  window.addEventListener('resize', ()=>{ resize(); initStars(); });
+  resize(); initStars(); requestAnimationFrame(draw);
+  let resizeTimer;
+  window.addEventListener('resize', ()=>{
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(()=>{ resize(); initStars(); }, 200);
+  });
 })();
 
-// ── CURSOR (apenas desktop) ───────────────────────────────────────────────────
+// ── CURSOR (apenas desktop, otimizado) ───────────────────────────────────────
 if(window.matchMedia('(hover: hover) and (pointer: fine)').matches){
   (function(){
     const cur = document.getElementById('cur');
     const ring = document.getElementById('curRing');
-    let mx=0, my=0, rx=0, ry=0;
+    let mx=0, my=0, rx=0, ry=0, ticking=false;
+    cur.style.left = '0'; cur.style.top = '0';
+    ring.style.left = '0'; ring.style.top = '0';
+
     document.addEventListener('mousemove', e => { mx=e.clientX; my=e.clientY; });
+
     (function loop(){
-      rx += (mx-rx)*0.12; ry += (my-ry)*0.12;
-      cur.style.left = mx+'px'; cur.style.top = my+'px';
-      ring.style.left = rx+'px'; ring.style.top = ry+'px';
+      rx += (mx-rx)*0.10; ry += (my-ry)*0.10;
+      cur.style.transform  = `translate(calc(${mx}px - 50%), calc(${my}px - 50%))`;
+      ring.style.transform = `translate(calc(${rx}px - 50%), calc(${ry}px - 50%))`;
       requestAnimationFrame(loop);
     })();
+
     document.addEventListener('mousedown', ()=>{ cur.style.width='6px'; cur.style.height='6px'; });
     document.addEventListener('mouseup',   ()=>{ cur.style.width='10px'; cur.style.height='10px'; });
   })();
 }
 
-// ── SPLASH ───────────────────────────────────────────────────────────────────
+// ── SPLASH (otimizado) ───────────────────────────────────────────────────────
 (function(){
   const canvas = document.getElementById('splashCanvas');
   const ctx = canvas.getContext('2d');
-  let W, H, particles = [], emojis = ['🧠','🏛','⚗️','🔬','💊','🫀','🫁','🧬','⚡','🌌','👽','✨','💉','🩺'];
-  let running = true;
+  const isMobile = window.innerWidth < 768;
+  let W, H, particles = [], running = true, last = 0;
+  const emojis = ['🧠','🏛','⚗️','🔬','💊','🫀','🧬','⚡','👽','✨','💉','🩺'];
+  const maxP = isMobile ? 10 : 16;
+  const fpsCap = isMobile ? 24 : 30;
+  const interval = 1000 / fpsCap;
 
   function resize(){ W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
 
   function spawnParticle(){
     return {
-      x: Math.random() * W,
-      y: H + 60,
+      x: Math.random() * W, y: H + 50,
       emoji: emojis[Math.floor(Math.random() * emojis.length)],
-      size: 20 + Math.random() * 28,
-      vx: (Math.random() - 0.5) * 1.2,
-      vy: -(0.6 + Math.random() * 1.2),
-      alpha: 0,
-      fadeIn: true,
-      rot: (Math.random() - 0.5) * 0.04,
+      size: 18 + Math.random() * 22,
+      vx: (Math.random() - 0.5) * 0.9,
+      vy: -(0.5 + Math.random() * 0.9),
+      alpha: 0, rot: (Math.random() - 0.5) * 0.03,
       angle: Math.random() * Math.PI * 2,
-      life: 0,
-      maxLife: 220 + Math.random() * 120
+      life: 0, maxLife: 200 + Math.random() * 100
     };
   }
 
   function init(){
-    particles = [];
-    for(let i = 0; i < 18; i++){
+    for(let i = 0; i < maxP; i++){
       const p = spawnParticle();
       p.y = Math.random() * H;
       p.life = Math.random() * p.maxLife;
-      p.alpha = 0.3 + Math.random() * 0.4;
-      p.fadeIn = false;
+      p.alpha = 0.25 + Math.random() * 0.35;
       particles.push(p);
     }
   }
 
-  function draw(){
+  function draw(ts){
     if(!running) return;
+    requestAnimationFrame(draw);
+    if(ts - last < interval) return;
+    last = ts;
     ctx.clearRect(0, 0, W, H);
     particles.forEach(p => {
       p.x += p.vx; p.y += p.vy; p.angle += p.rot; p.life++;
-      if(p.fadeIn && p.alpha < 0.7) p.alpha += 0.02;
-      if(p.life > p.maxLife - 40) p.alpha -= 0.018;
-      if(p.life > p.maxLife || p.y < -80){
-        Object.assign(p, spawnParticle());
-        return;
-      }
+      if(p.alpha < 0.6) p.alpha += 0.015;
+      if(p.life > p.maxLife - 35) p.alpha -= 0.02;
+      if(p.life > p.maxLife || p.y < -60) Object.assign(p, spawnParticle());
       ctx.save();
       ctx.globalAlpha = Math.max(0, p.alpha);
       ctx.translate(p.x, p.y);
@@ -1236,12 +1257,9 @@ if(window.matchMedia('(hover: hover) and (pointer: fine)').matches){
       ctx.fillText(p.emoji, 0, 0);
       ctx.restore();
     });
-    if(particles.length < 22 && Math.random() < 0.03) particles.push(spawnParticle());
-    requestAnimationFrame(draw);
   }
 
-  resize(); init(); draw();
-  window.addEventListener('resize', ()=>{ resize(); });
+  resize(); init(); requestAnimationFrame(draw);
 })();
 
 function enterSite(){
