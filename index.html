@@ -474,7 +474,24 @@ aside {
   justify-content: center;
   transition: background 0.15s;
 }
-.lightbox-close:hover { background: rgba(255,255,255,0.15); }
+/* ── LIGHTBOX BACK BTN ── */
+.lightbox-back {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--muted);
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.85rem;
+  padding: 0.5rem 1rem;
+  border-radius: 99px;
+  cursor: pointer;
+  margin-bottom: 1rem;
+  transition: background 0.15s, color 0.15s;
+  width: fit-content;
+}
+.lightbox-back:hover { background: rgba(255,255,255,0.12); color: var(--text); }
 
 /* ── FAB ADD ── */
 .fab {
@@ -960,6 +977,7 @@ aside {
   <div class="lightbox-inner">
     <img class="lightbox-img" id="lightboxImg" src="" alt="">
     <div class="lightbox-body">
+      <button class="lightbox-back" onclick="closeLightbox()">← Voltar</button>
       <div class="lightbox-titulo" id="lightboxTitulo"></div>
       <div class="lightbox-desc" id="lightboxDesc"></div>
     </div>
