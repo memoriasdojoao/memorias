@@ -850,8 +850,8 @@ aside {
 
     <div class="form-row">
       <label class="form-label">Substituir imagem (opcional)</label>
-      <input type="file" class="form-input" id="eImagem" accept="image/*" onchange="previewEditImg(this)">
-      <img class="img-preview" id="eImgPreview" alt="preview">
+      <input class="form-input" id="eImagem" placeholder="Cole o novo link do Google Drive (opcional)">
+      <img class="img-preview" id="eImgPreview" alt="preview" style="display:none">
     </div>
 
     <button class="btn-save-edit" onclick="salvarEdicao()">Salvar alterações</button>
@@ -904,9 +904,9 @@ aside {
 
     <div class="form-row">
       <label class="form-label">Imagem</label>
-      <input type="file" class="form-input" id="fImagem" accept="image/*" onchange="previewImg(this)">
-      <p class="hint">PNG, JPG ou WebP. Salvo no navegador.</p>
-      <img class="img-preview" id="imgPreview" alt="preview">
+      <input class="form-input" id="fImagem" placeholder="Cole o link do Google Drive aqui">
+      <p class="hint">No Drive: botão direito na imagem → Compartilhar → "Qualquer pessoa com o link" → Copiar link.</p>
+      <img class="img-preview" id="imgPreview" alt="preview" style="display:none">
     </div>
 
     <button class="btn-save" onclick="salvarPalacio()">Salvar palácio</button>
@@ -979,7 +979,7 @@ aside {
 })();
 
 // ── CONFIG ───────────────────────────────────────────────────────────────────
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwTSZ8vDrayF6vXQrTUXZDUm1efkOMLeVckR0tb8meDurCKSyqyXK3nw1KONuMnz2ZMtg/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzoINeeXVuDiCE6u0C_N34wr-EfGdYWuFJ-onZhZliN8lERUzZhwX3DQhJS1956xg-V/exec';
 const OWNER_PWD  = 'joao2025';
 
 // ── STATE ────────────────────────────────────────────────────────────────────
@@ -1167,11 +1167,12 @@ function toggleAdmin(){
   }
 }
 
-function previewImg(input){
-  const file=input.files[0]; if(!file) return;
-  const r=new FileReader();
-  r.onload=e=>{ const p=document.getElementById('imgPreview'); p.src=e.target.result; p.style.display='block'; };
-  r.readAsDataURL(file);
+function driveLink(url){
+  if(!url) return '';
+  // Converte link de compartilhamento para link direto de imagem
+  const m = url.match(/[-\w]{25,}/);
+  if(m) return 'https://drive.google.com/uc?export=view&id='+m[0];
+  return url;
 }
 
 async function salvarPalacio(){
@@ -1180,30 +1181,21 @@ async function salvarPalacio(){
   const materia= document.getElementById('fMateria').value.trim();
   const titulo = document.getElementById('fTitulo').value.trim();
   const desc   = document.getElementById('fDesc').value.trim();
-  const imgInput = document.getElementById('fImagem');
+  const imgUrl = driveLink(document.getElementById('fImagem').value.trim());
   if(!materia||!titulo){ alert('Preencha matéria e título.'); return; }
 
   const saveBtn = document.querySelector('#adminOverlay .btn-save');
   saveBtn.textContent = 'Salvando...'; saveBtn.disabled = true;
 
-  async function finish(imgData){
-    const palacio = { action:'add', id: Date.now().toString(), ano, era, materia, titulo, descricao:desc, imagem:imgData||'' };
-    await apiPost(palacio);
-    db.palacios.push({...palacio});
-    currentYear=ano; currentMateria=materia; currentEra=era;
-    ['fMateria','fTitulo','fDesc'].forEach(id=>document.getElementById(id).value='');
-    document.getElementById('fImagem').value='';
-    document.getElementById('imgPreview').style.display='none';
-    saveBtn.textContent='Salvar palácio'; saveBtn.disabled=false;
-    document.getElementById('adminOverlay').classList.remove('open');
-    render();
-  }
-
-  if(imgInput.files[0]){
-    const r=new FileReader();
-    r.onload=e=>finish(e.target.result);
-    r.readAsDataURL(imgInput.files[0]);
-  } else finish('');
+  const palacio = { action:'add', id: Date.now().toString(), ano, era, materia, titulo, descricao:desc, imagem:imgUrl };
+  await apiPost(palacio);
+  db.palacios.push({...palacio});
+  currentYear=ano; currentMateria=materia; currentEra=era;
+  ['fMateria','fTitulo','fDesc','fImagem'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('imgPreview').style.display='none';
+  saveBtn.textContent='Salvar palácio'; saveBtn.disabled=false;
+  document.getElementById('adminOverlay').classList.remove('open');
+  render();
 }
 
 function updateMateriasList(){
@@ -1234,42 +1226,30 @@ function openEdit(id){
 
 function closeEdit(){ document.getElementById('editOverlay').classList.remove('open'); }
 
-function previewEditImg(input){
-  const file=input.files[0]; if(!file) return;
-  const r=new FileReader();
-  r.onload=e=>{ const p=document.getElementById('eImgPreview'); p.src=e.target.result; p.style.display='block'; };
-  r.readAsDataURL(file);
-}
-
 async function salvarEdicao(){
   const id  = document.getElementById('eId').value;
   const idx = db.palacios.findIndex(x=>String(x.id)===String(id));
   if(idx===-1) return;
-  const imgInput = document.getElementById('eImagem');
+  const novoLink = document.getElementById('eImagem').value.trim();
   const saveBtn  = document.querySelector('#editOverlay .btn-save-edit');
   saveBtn.textContent='Salvando...'; saveBtn.disabled=true;
 
-  async function finish(imgData){
-    const updated = {
-      action:'update',
-      id,
-      ano:      document.getElementById('eAno').value,
-      era:      document.getElementById('eEra').value,
-      materia:  document.getElementById('eMateria').value.trim(),
-      titulo:   document.getElementById('eTitulo').value.trim(),
-      descricao:document.getElementById('eDesc').value.trim(),
-      imagem:   imgData !== null ? imgData : db.palacios[idx].imagem
-    };
-    await apiPost(updated);
-    db.palacios[idx] = {...updated};
-    currentYear=updated.ano; currentMateria=updated.materia; currentEra=updated.era;
-    saveBtn.textContent='Salvar alterações'; saveBtn.disabled=false;
-    closeEdit();
-    render();
-  }
-
-  if(imgInput.files[0]){ const r=new FileReader(); r.onload=e=>finish(e.target.result); r.readAsDataURL(imgInput.files[0]); }
-  else finish(null);
+  const updated = {
+    action:'update',
+    id,
+    ano:      document.getElementById('eAno').value,
+    era:      document.getElementById('eEra').value,
+    materia:  document.getElementById('eMateria').value.trim(),
+    titulo:   document.getElementById('eTitulo').value.trim(),
+    descricao:document.getElementById('eDesc').value.trim(),
+    imagem:   novoLink ? driveLink(novoLink) : db.palacios[idx].imagem
+  };
+  await apiPost(updated);
+  db.palacios[idx] = {...updated};
+  currentYear=updated.ano; currentMateria=updated.materia; currentEra=updated.era;
+  saveBtn.textContent='Salvar alterações'; saveBtn.disabled=false;
+  closeEdit();
+  render();
 }
 
 async function deletePalacio(id){
