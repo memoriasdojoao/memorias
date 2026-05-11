@@ -812,6 +812,84 @@ aside {
   letter-spacing: 0.08em;
 }
 
+/* ── VISITOR MODAL ── */
+.visitor-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(3,2,10,0.92);
+  z-index: 7000;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  backdrop-filter: blur(16px);
+}
+.visitor-overlay.open { display: flex; }
+.visitor-box {
+  background: rgba(10,6,30,0.98);
+  border: 1px solid rgba(110,43,255,0.3);
+  border-radius: 20px;
+  padding: 2.5rem 2rem;
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+  animation: lbIn 0.3s cubic-bezier(.22,.68,0,1.2);
+  box-shadow: 0 0 60px rgba(110,43,255,0.15);
+}
+.visitor-et {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  display: block;
+  animation: etFloat 3s ease-in-out infinite;
+  filter: drop-shadow(0 0 12px rgba(110,43,255,0.5));
+}
+.visitor-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--star);
+  margin-bottom: 0.4rem;
+}
+.visitor-sub {
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
+}
+.visitor-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(110,43,255,0.3);
+  border-radius: 10px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.95rem;
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+  outline: none;
+  text-align: center;
+  margin-bottom: 1rem;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.visitor-input:focus {
+  border-color: var(--nebula1);
+  box-shadow: 0 0 0 3px rgba(110,43,255,0.15);
+}
+.visitor-input::placeholder { color: var(--muted); }
+.visitor-btn {
+  width: 100%;
+  padding: 0.8rem;
+  border: none;
+  border-radius: 10px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: linear-gradient(135deg, var(--nebula1), var(--nebula2));
+  color: white;
+  transition: opacity 0.15s, transform 0.15s;
+}
+.visitor-btn:hover { opacity: 0.88; transform: translateY(-1px); }
+
 /* ── SCROLLBAR ── */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -952,6 +1030,17 @@ aside {
 </style>
 </head>
 <body>
+
+<!-- ── VISITOR MODAL ── -->
+<div class="visitor-overlay" id="visitorOverlay">
+  <div class="visitor-box">
+    <span class="visitor-et">👽</span>
+    <div class="visitor-title">Olá, terráqueo!</div>
+    <div class="visitor-sub">Antes de entrar no cérebro do João,<br>como você se chama?</div>
+    <input class="visitor-input" id="visitorName" placeholder="Seu nome..." maxlength="40" autocomplete="off">
+    <button class="visitor-btn" onclick="submitVisitor()">Entrar →</button>
+  </div>
+</div>
 
 <!-- ── SPLASH ── -->
 <div id="splash">
@@ -1241,6 +1330,41 @@ aside {
   });
 })();
 
+// ── VISITOR MODAL ─────────────────────────────────────────────────────────────
+const VISITOR_KEY = 'memorias_visitor';
+const VISITOR_DAYS = 7;
+
+function visitorSeen(){
+  const v = localStorage.getItem(VISITOR_KEY);
+  if(!v) return false;
+  const { exp } = JSON.parse(v);
+  return Date.now() < exp;
+}
+
+function showVisitorModal(){
+  document.getElementById('visitorOverlay').classList.add('open');
+  setTimeout(()=>document.getElementById('visitorName').focus(), 300);
+}
+
+async function submitVisitor(){
+  const nome = document.getElementById('visitorName').value.trim();
+  if(!nome) { document.getElementById('visitorName').focus(); return; }
+  const exp = Date.now() + VISITOR_DAYS * 24 * 60 * 60 * 1000;
+  localStorage.setItem(VISITOR_KEY, JSON.stringify({ nome, exp }));
+  document.getElementById('visitorOverlay').classList.remove('open');
+  // Registra na planilha
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'visit', nome })
+    });
+  } catch(e) {}
+}
+
+document.getElementById('visitorName').addEventListener('keydown', e=>{
+  if(e.key === 'Enter') submitVisitor();
+});
+
 // ── CURSOR (apenas desktop, otimizado) ───────────────────────────────────────
 if(window.matchMedia('(hover: hover) and (pointer: fine)').matches){
   (function(){
@@ -1405,7 +1529,11 @@ if(window.matchMedia('(hover: hover) and (pointer: fine)').matches){
 function enterSite(){
   const splash = document.getElementById('splash');
   splash.classList.add('hide');
-  setTimeout(()=>{ splash.style.display='none'; }, 800);
+  setTimeout(()=>{
+    splash.style.display='none';
+    // Mostra modal de visitante se não se identificou ainda
+    if(!ownerMode && !visitorSeen()) showVisitorModal();
+  }, 800);
 }
 (function(){
   const input = document.getElementById('searchInput');
