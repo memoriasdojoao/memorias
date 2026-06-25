@@ -423,23 +423,23 @@ aside {
   display: none;
   position: fixed;
   inset: 0;
-  background: rgba(3,2,10,0.92);
+  background: rgba(3,2,10,0.95);
   z-index: 1000;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  padding: 0.5rem;
   backdrop-filter: blur(16px);
 }
 .lightbox.open { display: flex; }
 
 .lightbox-inner {
-  max-width: 860px;
+  max-width: 1100px;
   width: 100%;
-  background: rgba(15,8,40,0.95);
+  background: rgba(15,8,40,0.98);
   border: 1px solid rgba(110,43,255,0.3);
   border-radius: 20px;
   overflow: hidden;
-  max-height: 90vh;
+  max-height: 96vh;
   display: flex;
   flex-direction: column;
   box-shadow: 0 0 80px rgba(110,43,255,0.2);
@@ -452,17 +452,25 @@ aside {
 
 .lightbox-img {
   width: 100%;
-  max-height: 60vh;
+  max-height: 72vh;
   object-fit: contain;
-  background: rgba(0,0,0,0.3);
+  background: rgba(0,0,0,0.4);
   display: block;
 }
 
 .lightbox-body {
-  padding: 1.5rem;
+  padding: 1.25rem 1.5rem 1.5rem;
   border-top: 1px solid rgba(110,43,255,0.2);
   overflow-y: auto;
+  max-height: 30vh;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(110,43,255,0.6) rgba(255,255,255,0.06);
 }
+
+.lightbox-body::-webkit-scrollbar { width: 6px; }
+.lightbox-body::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); border-radius: 3px; }
+.lightbox-body::-webkit-scrollbar-thumb { background: rgba(110,43,255,0.6); border-radius: 3px; }
+.lightbox-body::-webkit-scrollbar-thumb:hover { background: rgba(110,43,255,0.9); }
 
 .lightbox-titulo {
   font-family: 'Syne', sans-serif;
@@ -478,6 +486,9 @@ aside {
   line-height: 1.7;
   white-space: pre-wrap;
 }
+
+/* bold dentro da descrição */
+.lightbox-desc strong { color: var(--star); font-weight: 700; }
 
 .lightbox-close {
   position: absolute;
@@ -513,6 +524,27 @@ aside {
   width: fit-content;
 }
 .lightbox-back:hover { background: rgba(255,255,255,0.12); color: var(--text); }
+
+/* ── BOLD TOOLBAR ── */
+.text-toolbar {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+.toolbar-btn {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: var(--muted);
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.28rem 0.7rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  line-height: 1;
+}
+.toolbar-btn:hover { background: rgba(110,43,255,0.2); color: var(--text); border-color: rgba(110,43,255,0.4); }
 
 /* ── FAB ADD ── */
 .fab {
@@ -1205,6 +1237,10 @@ aside {
 
     <div class="form-row">
       <label class="form-label">Descrição</label>
+      <div class="text-toolbar">
+        <button type="button" class="toolbar-btn" onclick="insertBold('eDesc')" title="Negrito"><b>B</b></button>
+        <span style="font-size:0.7rem;color:var(--muted);align-self:center">Use **texto** para negrito</span>
+      </div>
       <textarea class="form-textarea" id="eDesc"></textarea>
     </div>
 
@@ -1259,6 +1295,10 @@ aside {
 
     <div class="form-row">
       <label class="form-label">Descrição</label>
+      <div class="text-toolbar">
+        <button type="button" class="toolbar-btn" onclick="insertBold('fDesc')" title="Negrito"><b>B</b></button>
+        <span style="font-size:0.7rem;color:var(--muted);align-self:center">Use **texto** para negrito</span>
+      </div>
       <textarea class="form-textarea" id="fDesc" placeholder="O que está representado neste palácio..."></textarea>
     </div>
 
@@ -1707,6 +1747,24 @@ function selectMateria(m){ currentMateria=m; renderSidebar(); renderContent(); u
 function selectEra(e){ currentEra=e; renderContent(); }
 
 // ── LIGHTBOX ─────────────────────────────────────────────────────────────────
+function parseBold(text){
+  // Converte **texto** para <strong>texto</strong>
+  return text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+}
+
+function insertBold(fieldId){
+  const ta = document.getElementById(fieldId);
+  const start = ta.selectionStart;
+  const end   = ta.selectionEnd;
+  const sel   = ta.value.substring(start, end);
+  const replacement = sel ? `**${sel}**` : '**negrito**';
+  ta.value = ta.value.substring(0, start) + replacement + ta.value.substring(end);
+  // posiciona cursor
+  const newPos = sel ? start + replacement.length : start + 2;
+  ta.setSelectionRange(newPos - (sel ? 0 : 8), newPos - (sel ? 0 : 2));
+  ta.focus();
+}
+
 function openLightbox(id){
   const p = db.palacios.find(x=>String(x.id)===String(id));
   if(!p) return;
@@ -1714,7 +1772,11 @@ function openLightbox(id){
   img.src = p.imagem||'';
   img.style.display = p.imagem?'block':'none';
   document.getElementById('lightboxTitulo').textContent = p.titulo;
-  document.getElementById('lightboxDesc').textContent = p.descricao||'';
+  // Renderiza negrito
+  const desc = p.descricao||'';
+  document.getElementById('lightboxDesc').innerHTML = parseBold(
+    desc.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  );
   document.getElementById('lightbox').classList.add('open');
 }
 function closeLightbox(){ document.getElementById('lightbox').classList.remove('open'); }
